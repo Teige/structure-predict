@@ -58,22 +58,27 @@ datadir=~/film3/$seqname/
 
 grep -A1 $(awk 'NR==1 {print $1}' $seqdir$seqname.seed|cut --complement -c 1) $seqdir$seqname.fasta | sed '1d' > $datadir$seqname.target #search for seed accession in fasta alignment, take the line beneath the matching accession, which should be the corresponding sequence - this is the target, save it as temp.
 
-cut --complement -c $(grep -o . $datadir$seqname.target | grep -n '-'| tr -d ':-'|tr '\n' ',' | sed 's/,$//') $seqdir$seqname.raw | uniq -u > $datadir$seqname.temp #use a comma-separated list of the positions of - gaps in the target seq (counting from 1), as positions for cut to remove in all lines of the raw sequence alignment. Remove duplicate lines with uniq. Save final alignment as .temp
+cut --complement -c $(grep -o . $datadir$seqname.target | grep -n '-'| tr -d ':-'|tr '\n' ',' | sed 's/,$//') $seqdir$seqname.raw | sort | uniq > $datadir$seqname.temp #use a comma-separated list of the positions of - gaps in the target seq (counting from 1), as positions for cut to remove in all lines of the raw sequence alignment. Remove duplicate lines with uniq. Save final alignment as .temp
 
+seqlen=$(awk '{print length}' $datadir$seqname.temp | uniq) #measure length of sequences in MSA
+eval $(echo "grep -v '[-]\{$((seqlen/2)),\}' $datadir$seqname.temp > $datadir$seqname.temp2") #remove poorly aligned seqs whose length is half or more made up of gaps
 
 echo $seqname > $datadir$seqname.aln 
-wc -l $datadir$seqname.temp | awk '{print $1}' >> $datadir$seqname.aln 
+wc -l $datadir$seqname.temp2 | awk '{print $1}' >> $datadir$seqname.aln 
 awk 'NR==3{print;exit}' $datadir$seqname.ess >> $datadir$seqname.aln
 tr -d '-' < $datadir$seqname.target >> $datadir$seqname.aln
-grep -vx $(tr -d '-' < $datadir$seqname.target) $datadir$seqname.temp >> $datadir$seqname.aln
+grep -vx $(tr -d '-' < $datadir$seqname.target) $datadir$seqname.temp2 >> $datadir$seqname.aln
 #alnfile written, now the parameter file
 
 #uncomment to remove target seq, otherwise keep for later troubleshooting or checking.
 #rm $datadir$seqname.target #remove target file (of target seq as it sits in the alignment). Next we need to prepend info from the .ess to the .temp alignment to create .aln. Then write an nfpar file for film3 to read.
+#rm $datadir$seqname.temp
+#rm $datadir$seqname.temp2
 
 echo -e "ALNFILE $seqname.aln\nINITEMP 0.6\nMAXSTEPS 20000000\nPOOLSIZE 9\nTRATIO 0.6\nMAXFRAGS 5\nMAXFRAGS2 25\nCONFILE $seqname.con\n\n# Uncomment line below to apply Z-coordinate constraints\n#ZFILE $seqname.zcoord" > $datadir$seqname.nfpar
 
 cd $datadir
-printf "${datadir}output/fold%03d.pdb_-_" {1..100}| parallel --nice $niceness -S :,tpalmer@moscow --progress -d _-_ film3 $datadir$seqname.nfpar ${stdin} #GNU parallel splits jobs film3 input fold{001-100} to multiple cores. Pass stdin, an array of output file names delimited by underscores to parallel to construct (film3) command line, set argument delimited to underscore with '-d _'.
+mkdir -p output
+printf "${datadir}output/fold%03d.pdb_-_" {1..100}| parallel --nice $niceness -S :,tpalmer@moscow --progress -d _-_ film3 $datadir$seqname.nfpar ${stdin} #GNU parallel splits jobs film3 input fold{001-100} to multiple cores. Pass stdin, an array of output file names delimited by unique underscores to parallel to construct (film3) command line, set argument delimiter to underscore-dash-underscore with '-d _-_'.
 
-#REMAINING HURDLE: cannot build side chain for unknown residue type. This error appears to be due to gap characters in the first sequence of the MSA in the alnfile. The order of the MSA appears to be important. Hence, change alnfile writing to write the target seq first, then all others (minus the target).
+#REMAINING HURDLE: film3 progresses with nan (not a number) values for all important parameters.
