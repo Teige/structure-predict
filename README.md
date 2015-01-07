@@ -5,7 +5,7 @@ Scripting my structure prediction workflow
 
 
 1.  Acquire ‘target seq’ = campy seq
-2.  jackhmmer -N <5> -A <alnfile> —noali —notextw —incE 0.001 —max —cpu <12>  <target seq> <nr fasta database> #make note of database version!
+2.  jackhmmer -N <5> -A <alnfile.stockholm> --noali --notextw --incE 0.001 --max --cpu <12>  <target seq> <nr fasta database> #make note of database version!
 3.  parse alnfile output to raw seqs & FASTA format using clean_hmmer.lines script, keep both (raw & FASTA) formats.
 4.  psicov <rawalnfile> >target.con #-d <nnn> to set target precision matrix sparsity (find out appropriate target for TM proteins!)
 5.  tcsh runpsipred <target seq> #set db in script, should db be filtered in the case of TM proteins?
